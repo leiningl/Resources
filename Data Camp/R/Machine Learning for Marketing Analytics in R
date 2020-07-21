@@ -1,0 +1,310 @@
+# 1) Modeling Customer Lifetime Value with Linear Regression
+
+# Structure of dataset
+str(salesData, give.attr = FALSE)
+
+# Visualization of correlations
+salesData %>% select_if(is.numeric) %>%
+  select(-id) %>%
+  cor() %>%
+  corrplot()
+
+# Frequent stores
+ggplot(salesData) +
+    geom_boxplot(aes(x = mostFreqStore, y = salesThisMon))
+
+# Preferred brand
+ggplot(salesData) +
+    geom_boxplot(aes(x = preferredBrand, y = salesThisMon))
+    
+# Model specification using lm
+salesSimpleModel <- lm(salesThisMon ~ salesLast3Mon, 
+                       data = salesData)
+
+# Looking at model summary
+summary(salesSimpleModel)
+
+# Estimating the full model
+salesModel1 <- lm(salesThisMon ~ . - id, 
+                 data = salesData)
+
+# Checking variance inflation factors
+vif(salesModel1)
+
+# Estimating new model by removing information on brand
+salesModel2 <- lm(salesThisMon ~ . - id - preferredBrand - nBrands, 
+                 data = salesData)
+
+# Checking variance inflation factors
+vif(salesModel2)
+
+# getting an overview of new data
+summary(salesData2_4)
+
+# predicting sales
+predSales5 <- predict(salesModel2, newdata = salesData2_4)
+
+# calculating mean of future sales
+mean(predSales5, na.rm=TRUE)
+
+
+
+# 2) Logistic Regression for Churn Prevention
+
+# Summary of data
+summary(defaultData)
+
+# Look at data structure
+str(defaultData)
+
+# Analyze the balancedness of dependent variable
+ggplot(defaultData,aes(x = PaymentDefault)) +
+  geom_histogram(stat = "count") 
+  
+# Build logistic regression model
+logitModelFull <- glm(PaymentDefault ~ limitBal + sex + education + marriage +
+                   age + pay1 + pay2 + pay3 + pay4 + pay5 + pay6 + billAmt1 + 
+                   billAmt2 + billAmt3 + billAmt4 + billAmt5 + billAmt6 + payAmt1 + 
+                   payAmt2 + payAmt3 + payAmt4 + payAmt5 + payAmt6, 
+                family = binomial, data = defaultData)
+
+# Take a look at the model
+summary(logitModelFull)
+
+# Take a look at the odds ratios
+coefsexp <- coef(logitModelFull) %>% exp() %>% round(2)
+coefsexp
+
+library(MASS)
+# The old (full) model
+logitModelFull <- glm(PaymentDefault ~ limitBal + sex + education + marriage +
+                   age + pay1 + pay2 + pay3 + pay4 + pay5 + pay6 + billAmt1 + 
+                   billAmt2 + billAmt3 + billAmt4 + billAmt5 + billAmt6 + payAmt1 + 
+                   payAmt2 + payAmt3 + payAmt4 + payAmt5 + payAmt6, 
+                 family = binomial, defaultData)
+
+#Build the new model
+logitModelNew <- stepAIC(logitModelFull, trace=0) 
+
+#Look at the model
+summary(logitModelNew) 
+
+# Save the formula of the new model (it will be needed for the out-of-sample part) 
+formulaLogit <- as.formula(summary(logitModelNew)$call)
+formulaLogit
+
+# Make predictions using the full Model
+defaultData$predFull <- predict(logitModelFull, type = "response", na.action = na.exclude)
+
+# Construct the in-sample confusion matrix
+confMatrixModelFull <- confusion.matrix(defaultData$PaymentDefault,defaultData$predFull, threshold = 0.5)
+confMatrixModelFull
+
+# Calculate the accuracy for the full Model
+accuracyFull <- sum(diag(confMatrixModelFull)) / sum(confMatrixModelFull)
+accuracyFull
+
+# Calculate the accuracy for 'logitModelNew'
+# Make prediction
+defaultData$predNew <- predict(logitModelNew, type = 'response', na.action = na.exclude)
+
+# Construct the in-sample confusion matrix
+confMatrixModelNew <- confusion.matrix(defaultData$PaymentDefault,defaultData$predNew, threshold = 0.5)
+confMatrixModelNew
+
+# Calculate the accuracy...
+accuracyNew <- sum(diag(confMatrixModelNew)) / sum(confMatrixModelNew)
+accuracyNew
+
+# and compare it to the full model's accuracy
+accuracyFull
+
+library(SDMTools)
+
+# Confusion matrix with threshold 0.5
+confMat <- confusion.matrix(defaultData$PaymentDefault,
+                               defaultData$predNew, 
+                               threshold = 0.5)
+confMat
+
+# Here is the confusion matrix with threshold 0.5
+confMat <- confusion.matrix(defaultData$PaymentDefault,
+                               defaultData$predNew, 
+                               threshold = 0.5)
+confMat
+
+# Calculate and check payoff
+payoff <- 1000*confMat[2,2] - 250*confMat[2,1]
+payoff
+
+# First look at the payoff matrix
+payoffMatrix
+
+# Set up the loop
+for(i in 1:5) {
+  # Calculate specific confusion matrix with respective threshold
+  confMatrix <- confusion.matrix(defaultData$PaymentDefault,
+                defaultData$predNew, 
+                threshold = payoffMatrix$threshold[i])
+  # Calculate payoff and save it to the corresponding row
+  payoffMatrix$payoff[i] <- 1000*confMatrix[2,2] - 250*confMatrix[2,1]
+}
+payoffMatrix
+
+# Split data in train and test set
+set.seed(534381) 
+defaultData$isTrain <- rbinom(nrow(defaultData), 1, 0.66)
+train <- subset(defaultData, defaultData$isTrain == 1)
+test <- subset(defaultData, defaultData$isTrain  == 0)
+
+logitTrainNew <- glm(formulaLogit, family = binomial, data = train) # Modeling
+test$predNew <- predict(logitTrainNew, type = "response", newdata = test) # Predictions
+
+# Out-of-sample confusion matrix and accuracy
+confMatrixModelNew <- confusion.matrix(test$PaymentDefault,test$predNew,  threshold = 0.3) 
+sum(diag(confMatrixModelNew)) / sum(confMatrixModelNew) # Compare this value to the in-sample accuracy
+
+library(boot)
+# Accuracy function
+costAcc <- function(r, pi = 0) {
+  cm <- confusion.matrix(r, pi, threshold = 0.3)
+  acc <- sum(diag(cm)) / sum(cm)
+  return(acc)
+}
+
+# Cross validated accuracy for logitModelNew
+set.seed(534381)
+cv.glm(defaultData, logitModelNew, cost = costAcc, K = 6)$delta[1]
+
+
+
+# 3) Modeling TIme to Reorder with Survival Analysis
+
+# Look at the head of the data
+head(dataNextOrder)
+
+# Plot a histogram
+ggplot(dataNextOrder) +
+  geom_histogram(aes(x = daysSinceFirstPurch,
+                     fill = factor(boughtAgain))) +
+  facet_grid( ~ boughtAgain) + # Separate plots for boughtAgain = 1 vs. 0
+  theme(legend.position = "none") # Don't show legend
+  
+# Create survival object
+survObj <- Surv(dataNextOrder$daysSinceFirstPurch, dataNextOrder$boughtAgain)
+
+# Look at structure
+str(survObj)
+
+# Compute and print fit
+fitKMSimple <- survfit(survObj ~ 1)
+print(fitKMSimple)
+
+# Plot fit
+plot(fitKMSimple,
+     conf.int = FALSE, xlab = "Time since first purchase", ylab = "Survival function", main = "Survival function")
+
+# Compute fit with categorical covariate
+fitKMCov <- survfit(survObj ~ voucher, data = dataNextOrder)
+
+# Plot fit with covariate and add labels
+plot(fitKMCov, lty = 2:3,
+    xlab = "Time since first purchase", ylab = "Survival function", main = "Survival function")
+legend(90, .9, c("No", "Yes"), lty = 2:3)
+
+# Determine distributions of predictor variables
+dd <- datadist(dataNextOrder)
+options(datadist = "dd")
+
+# Compute Cox PH Model and print results
+fitCPH <- cph(Surv(daysSinceFirstPurch, boughtAgain) ~ shoppingCartValue + voucher + returned + gender,
+              data = dataNextOrder,
+              x = TRUE, y = TRUE, surv = TRUE)
+print(fitCPH)
+
+# Interpret coefficients
+exp(fitCPH$coefficients)
+
+# Plot result summary
+plot(summary(fitCPH), log = TRUE)
+
+# Check proportional hazard assumption and print result
+testCPH <- cox.zph(fitCPH)
+print(testCPH)
+
+# Plot time-dependent beta
+plot(testCPH, var = "gender=male")
+
+# Load rms package
+library(rms)
+
+# Validate model
+validate(fitCPH, method = "crossvalidation",
+         B = 10, dxy = TRUE, pr = FALSE)
+         
+# Create data with new customer
+newCustomer <- data.frame(daysSinceFirstPurch = 21, shoppingCartValue = 99.90, gender = "female", voucher = 1, returned = 0, stringsAsFactors = FALSE)
+
+# Make predictions
+pred <- survfit(fitCPH, newdata = newCustomer)
+print(pred)
+plot(pred)
+
+# Dataset is copied. Now correct the customer's gender there
+newCustomer2 <- newCustomer
+newCustomer2$gender <- 'male'
+
+# Redo prediction
+pred2 <- survfit(fitCPH, newdata = newCustomer2)
+print(pred2)
+
+
+
+# 4) Reducing Dimensionality with Principal Component Analysis
+
+# Overview of data structure:
+str(newsData, give.attr = FALSE)
+
+# Correlation structure:
+newsData %>% cor() %>% corrplot()
+
+# Standardize data
+newsData <- newsData %>% scale() %>% as.data.frame()
+
+# Compute PCA
+pcaNews <- newsData %>% prcomp()
+
+# Eigenvalues
+pcaNews$sdev^2 %>% round(2)
+
+# Screeplot:
+screeplot(pcaNews, type = 'lines')
+
+# Cumulative explained variance:
+summary(pcaNews)
+
+# Kaiser-Guttmann (number of components with eigenvalue larger than 1):
+sum(pcaNews$sdev^2 > 1)
+
+# Print loadings of the first component
+pcaNews$rotation[, 1] %>% round(2)
+
+# Print loadings of the first six components
+pcaNews$rotation[, 1:6] %>% round(2)
+
+pcaNews %>% biplot(cex = 0.5)
+
+# Predict log shares with all original variables
+mod1 <- lm(logShares ~ ., data = newsData)
+
+# Create dataframe with log shares and first 6 components
+dataNewsComponents <- cbind(logShares = newsData[, "logShares"],
+                            pcaNews$x[, 1:6]) %>%
+  as.data.frame()
+
+# Predict log shares with first six components
+mod2 <- lm(logShares ~ ., data = dataNewsComponents)
+
+# Print adjusted R squared for both models
+summary(mod1)$adj.r.squared
+summary(mod2)$adj.r.squared
