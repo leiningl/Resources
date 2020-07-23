@@ -1,0 +1,360 @@
+# 1) Presidential Job Approval Polls
+
+# Import dplyr
+library(dplyr)
+
+# Select President, Date, and Approve from approval_polls
+approval_polls %>% 
+  select(President, Date, Approve) %>%
+  head()
+  
+# Import dplyr
+library(dplyr)
+
+# Select the President, Date, and Approve columns and filter to observations where President is equal to "Trump"
+approval_polls %>% 
+  select(President,Date,Approve) %>%
+  filter(President == "Trump")
+  
+# Group the approval_polls dataset by president and summarise a mean of the Approve column 
+approval_polls %>%
+  group_by(President) %>%
+  summarise(Approve = mean(Approve))
+  
+# Extract, or "pull," the Approve column as a vector and save it to the object "TrumpApproval"
+TrumpApproval <- approval_polls %>% 
+  select(President,Date,Approve) %>%
+  filter(President == "Trump") %>%
+  pull(Approve)
+
+# Take a mean of the TrumpApproval vector
+mean(TrumpApproval)
+
+# Load the lubridate package for wrangling dates
+library(lubridate)
+
+# Select the relevant columns from the approval_polls dataset and filter them for the Trump presidency
+TrumpPolls <- approval_polls %>% 
+  select(President,Date,Approve) %>%
+  filter(President == "Trump")
+  
+# Use the months() and mdy() function to get the month of the day each poll was taken
+# Group the dataset by month and summarize a mean of Trump's job approval by month
+TrumpPolls %>%
+  mutate(Month = months(mdy(Date))) %>%
+  group_by(Month) %>%
+  summarise(Approve = mean(Approve))
+  
+# Save Donald Trump's approval polling to a separate object 
+TrumpApproval <- approval_polls %>% 
+  filter(President == "Trump") %>%
+  mutate(Date = mdy(Date)) %>%
+  arrange(Date) 
+
+# use the rollmean() function from the zoo package to get a moving average of the last 10 polls
+library(zoo)
+TrumpApproval <- TrumpApproval %>%
+  mutate(AvgApprove = rollmean(Approve, 10, na.pad=TRUE, align = "right"))
+  
+# Load ggplot2
+library(ggplot2)
+
+# Use ggplot to graph Trump's average approval over time
+ggplot(data = TrumpApproval, aes(x=Date,y=AvgApprove)) + 
+  geom_line()
+  
+# Create an moving average of each president's approval rating
+AllApproval <- approval_polls %>%
+  group_by(President) %>%
+  mutate(AvgApprove = rollmean(Approve, 10, na.pad=TRUE, align = "right"))
+
+# Graph an moving average of each president's approval rating
+ggplot(data = AllApproval, aes(x=Days, y=AvgApprove, col=President)) + 
+    geom_line()
+    
+    
+
+# 2) U.S. House and Senate Polling
+
+# Import dplyr
+library(dplyr)
+
+# Look at the header and first few rows of the data
+head(generic_ballot)
+
+# Filter the election year to 2016 and select the Date, Democrats, and Republicans columns
+generic_ballot %>%
+  filter(ElecYear == 2016) %>%
+  select(Date,Democrats, Republicans)
+  
+# Mutate a new variable called "Democratic.Margin" equal to the difference between Democrats' vote share and Republicans'
+democratic_lead <- generic_ballot %>%
+  mutate(Democratic.Margin = Democrats - Republicans)
+
+# Take a look at that new variable!
+democratic_lead %>%
+  select(Democratic.Margin)
+  
+# Group the generic ballot dataset by year and summarise an average of the Democratic.Margin variable
+over_time <- democratic_lead %>% 
+  group_by(ElecYear) %>%
+  summarise(Democratic.Margin = mean(Democratic.Margin))
+
+# Explore the data.frame
+head(over_time)
+
+# Import the lubridate package
+library(lubridate)
+
+# Create a month and year variable for averaging polls by approximate date
+timeseries <- democratic_lead %>%
+  mutate(Date = mdy(Date),
+         month = month(Date),
+         yr = year(Date))
+
+# Now group the polls by their month and year, then summarise
+timeseries <- timeseries %>%
+  group_by(yr,month) %>%
+  summarise(Democratic.Margin = mean(Democratic.Margin))
+  
+# Mutate a new variable to use a date summary for the monthly average
+timeseries_plot <- timeseries %>%
+  mutate(time = sprintf("%s-%s-%s",yr,month,"01"))
+
+# Import ggplot2
+library(ggplot2)
+
+# Plot the line over time
+ggplot(timeseries_plot,aes(x=ymd(time),y=Democratic.Margin)) +
+  geom_line()
+  
+# Import ggplot2
+library(ggplot2)
+
+# Make a ggplot with points for monthly polling averages and one trend line running through the entire time series
+ggplot(timeseries_plot,aes(x=ymd(time),y=Democratic.Margin)) +
+  geom_point() + 
+  geom_smooth(span=0.2)
+  
+# Mutate two variables for the Democrats' margin in polls and election day votes
+poll_error <- generic_ballot %>%
+  mutate(Dem.Poll.Margin = Democrats - Republicans,
+         Dem.Vote.Margin = DemVote - RepVote)
+
+# Average those two variables per year and mutate the "error" variable
+poll_error <- poll_error %>%
+  group_by(ElecYear) %>%
+  summarise(Dem.Poll.Margin = mean(Dem.Poll.Margin),
+            Dem.Vote.Margin = mean(Dem.Vote.Margin)) %>%
+  mutate(error = Dem.Poll.Margin - Dem.Vote.Margin)
+  
+# Calculate the room-mean-square error of the error variable
+rmse <- sqrt(mean(poll_error$error^2))
+
+# Multiply the RMSE by 1.96 to get the 95% confidence interval, or "margin of error"
+CI <- rmse * 1.96
+
+# Add variables to our dataset for the upper and lower bound of the `Dem.Poll.Margin` variable
+by_year <- poll_error %>%
+  mutate(upper = Dem.Poll.Margin + CI,
+         lower = Dem.Poll.Margin - CI)
+         
+# Load the ggplot2 package
+library(ggplot2)
+
+# Plot estimates for Dem.Poll.Margin and Dem.Vote.Margin on the y axis for each year on the x axis with geom_point
+ggplot(by_year) + 
+    geom_point(aes(x=ElecYear, y=Dem.Poll.Margin, col="Poll")) +
+    geom_point(aes(x=ElecYear, y=Dem.Vote.Margin, col="Vote")) +
+    geom_errorbar(aes(x=ElecYear, ymin=lower, ymax=upper))
+    
+# Fit a model predicting Democratic vote margin with Democratic poll margin
+model <- lm(Dem.Vote.Margin ~ Dem.Poll.Margin, data=by_year)
+  
+# Evaluate the model
+summary(model)
+
+# Make a new data.frame that has our prediction variable and value
+predictdata <- data.frame("Dem.Poll.Margin" = 5)
+
+# Make the prediction with the coefficients from our model
+predict(model, predictdata)
+
+
+
+
+# 3) Election Results and Political Demography
+
+# Deselect the is.national.winner, national.count, and national.party.percent variables
+uspres_results.slim <- uspres_results %>%
+  select(-c(is.national.winner, national.count, national.party.percent))
+
+# Import the tidyr package to use the spread() function
+library(tidyr)
+
+# Spread party and votes to their own columns
+uspres_county <- uspres_results.slim %>%
+  spread(key=party,value=vote.count)
+
+# Add a variable to the uspres_county dataset to store the Democrat's percentage of votes
+uspres_county <- uspres_county %>%
+  mutate(Dem.pct = D/county.total.count)
+  
+# Import the choroplethr package
+library(choroplethr)
+
+# Load the county demographic data
+data(df_county_demographics)
+
+# Look at the demographic data
+head(df_county_demographics)
+
+# Rename the 'region' variable in df_county_demographics to "county.fips"
+df_county_demographics <- df_county_demographics %>%
+  rename("county.fips" = region)
+
+# Join county demographic with vote share data via its FIPS code
+county_merged <- left_join(df_county_demographics,
+                         uspres_county, by = "county.fips")
+
+head(county_merged)
+
+# plot percent_white and Dem.pct on the x and y axes. add points and a trend line
+ggplot(county_merged, aes(x=percent_white, y=Dem.pct)) +
+  geom_point() +
+  geom_smooth(method="lm")
+  
+# Rename the county.fips and Dem.pct variables from our dataset to "region" and "value"
+county_map <- county_merged %>%
+  rename("region" = county.fips,
+                "value" = Dem.pct)
+
+# Create the map with choroplethrMaps's county_choropleth()
+democratic_map <- county_choropleth(county_map)
+
+# Print the map
+democratic_map
+
+# Rename variables from our dataset
+county_map <- county_merged %>%
+  rename("region" = county.fips,
+         "value" = percent_white)
+
+# Create the map with choroplethr's county_choropleth()
+white_map <- county_choropleth(county_map)
+
+# Print the maps side-by-side
+library(gridExtra)
+
+# Graph the two maps (democratic_map and white_map) from the previous exercises side-by-side
+grid.arrange(democratic_map, white_map)
+
+# Fit a linear model to predict Dem.pct dependent on percent_white in each county
+fit <- lm(Dem.pct ~ percent_white, data=county_merged)
+
+# Evaluate the model
+summary(fit)
+
+# Fit a linear model to predict Dem.pct dependent on percent_white and per_capita_income in each county
+fit <- lm(Dem.pct ~ percent_white + per_capita_income, data=county_merged)
+
+# Evaluate the model
+summary(fit)
+
+# Filter the dataset to polls only released after June 16th, 2016, and mutate a variable for the Remain campaign's lead
+brexit_average <- brexit_polls %>%
+  filter(mdy(Date)>ymd("2016-06-16") )%>%
+  mutate(RemainLead = Remain - Leave)  
+
+# Average the last seven days of polling
+mean(brexit_average$RemainLead)
+
+# Summarise the Remain lead from the entire month of the referendum 
+ggplot(brexit_polls, aes(x=mdy(Date), y= Remain - Leave)) +
+  geom_point() + 
+  geom_smooth(method='loess')
+  
+# Familiarize yourself with the data using the head() function
+head(brexit_results)
+
+# Chart the counstituency-by-constituency relationship between voting for the Labour Party and voting to leave the EU
+ggplot(brexit_results,aes(x=lab_2015,y=leave_share)) + 
+  geom_point()
+  
+# Show the relationship between UKIP and Leave vote share with points and a line representing the linear relationship between the variables
+ggplot(brexit_results,aes(x=ukip_2015,y=leave_share)) + 
+  geom_point()  +
+  geom_smooth(method = "lm")
+  
+# predict leave's share with the percentage of a constituency that holds a college degree and its 2015 UKIP vote share
+model.multivar <- lm(leave_share ~ ukip_2015 + degree, brexit_results)
+
+summary(model.multivar)
+
+
+
+# 4) Predicting the Future of Politics
+
+# Import dplyr and lubridate
+library(dplyr)
+library(lubridate)
+
+# average all of the generic ballot polls that have been taken since June
+polls_2018 %>% 
+    filter(month(end_date) > 6) %>% 
+    mutate(Dem.Margin = Democrat - Republican) %>%
+    pull(Dem.Margin) %>%
+	  mean()
+    
+# Filter the dataset to include polls from August and September
+# Mutate a variable for the Democratic vote margin in that year
+polls_predict <- generic_ballot %>%
+    filter(month(mdy(Date)) %in% c(8,9)) %>%
+    mutate(Dem.Poll.Margin = Democrats - Republicans,
+           Dem.Vote.Margin = DemVote - RepVote)
+
+# Group by election year
+polls_predict <- polls_predict %>%
+    group_by(ElecYear) %>%
+    summarise(Dem.Poll.Margin = mean(Dem.Poll.Margin),
+              Dem.Vote.Margin = mean(Dem.Vote.Margin))
+              
+ # Fit a model to predict Democrats' November vote margin with the Democratic poll margin and party in power variable
+model <- lm(Dem.Vote.Margin ~ Dem.Poll.Margin + party_in_power, data=polls_predict)
+
+# Evaluate the model
+summary(model)
+
+# Make a prediction for November if Democrats are up 7.5 points in the generic ballot and the party_in_power is the Republicans (-1)
+predict(model, data.frame(Dem.Poll.Margin = 7.5, party_in_power=-1))
+
+# Multiply the root-mean-square error by 1.96
+sqrt(mean(c(model$fitted.values - polls_predict$Dem.Vote.Margin)^2)) * 1.96
+
+# Import ggplot2
+library(ggplot2)
+
+#  Make a plot with points representing a year's presidential approval and vote share and a line running through them to show the linear relationship
+ggplot(pres_elecs,aes(x=pres_approve, y=vote_share, label=Year)) + 
+  geom_text() + 
+  geom_smooth(method='lm')
+  
+# Make a model that predict the vote_share variable with pres_approve, q2_gdp, and two_plus_terms
+fit <- lm(vote_share ~ pres_approve + q2_gdp + two_plus_terms, pres_elecs)
+
+# Evaluate the model
+summary(fit)
+
+# Save the predicted vote shares to a variable called predict
+pres_elecs$predict <- predict(fit, pres_elecs)
+
+# Graph the predictions and vote shares with a label for each election year
+ggplot(pres_elecs,aes(x=predict, y=vote_share, label=Year)) + 
+  geom_abline() +
+  geom_text()
+
+# Calculate the model's root-mean-square error
+sqrt(mean(c(pres_elecs$predict - pres_elecs$vote_share)^2)) * 1.96
+
+# Make a prediction for hypothetical data
+predict(fit, data.frame(pres_approve=-15, q2_gdp=2, two_plus_terms=0))
