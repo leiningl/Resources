@@ -1,0 +1,181 @@
+# 1) Basics of Supply Chain Optimization and PuLP
+
+# Initialize Class
+model = LpProblem("Maximize Glass Co. Profits", LpMaximize)
+
+# Define Decision Variables
+wine = LpVariable('Wine', lowBound=0, upBound=None, cat='Integer')
+beer = LpVariable('Beer', lowBound=0, upBound=None, cat='Integer')
+
+# Define Objective Function
+model += 5 * wine + 4.5 * beer
+
+# Define Constraints
+model += 6 * wine + 5 * beer <= 60
+model += 10 * wine + 20 * beer <= 150
+model += wine <= 6
+
+
+# Define Objective Function
+model += lpSum([1.5 * var_dict[(i, 'cream')] 
+                + 0.125 * var_dict[(i, 'milk')] 
+                + 0.10 * var_dict[(i, 'sugar')]
+                
+                # Iterate over product types
+                for i in prod_type])
+                
+                
+from pulp import *
+
+# Initialize Model
+model = LpProblem("Minimize Transportation Costs", LpMinimize)
+
+# Build the lists and the demand dictionary
+warehouse = ['New York', 'Atlanta']
+customers = ['East', 'South', 'Midwest', 'West']
+regional_demand = [1800, 1200, 1100, 1000]
+demand = dict(zip(customers, regional_demand))
+
+# Define Objective
+model += lpSum([costs[(w, c)] * var_dict[(w, c)] 
+                for c in customers for w in warehouse])
+
+# For each customer, sum warehouse shipments and set equal to customer demand
+for c in customers:
+    model += lpSum([var_dict[(w, c)] for w in warehouse]) == demand[c]
+
+
+
+# 2) Modeling in PuLP
+
+# Define decision variables
+key = [(m, w, c) for m in months for w in warehouse for c in customers]
+var_dict = LpVariable.dicts('num_of_shipments', 
+                            key, 
+                            lowBound=0, cat='Integer')
+
+# Use the LpVariable dictionary variable to define objective
+model += lpSum([costs[(w, c)] * var_dict[(m, w, c)] 
+                for m in months for w in warehouse for c in customers])
+                
+                
+# Define Decision Variables
+x = LpVariable.dicts('X', [(c1, c2) for c1 in cities for c2 in cities], 
+                     cat='Binary')
+u = LpVariable.dicts('U', [c1 for c1 in cities], 
+                     lowBound=0, upBound=(n-1), cat='Integer')
+
+# Define Objective
+model += lpSum([dist.iloc[c1, c2] * x[(c1, c2)] 
+                for c1 in cities for c2 in cities])
+
+# Define Constraints
+for c2 in cities:
+    model += lpSum([x[(c1, c2)] for c1 in cities]) == 1
+for c1 in cities:
+    model += lpSum([x[(c1, c2)] for c2 in cities]) == 1
+    
+    
+# The class has been initialize, and x, days, and objective function defined
+model = LpProblem("Minimize Staffing", LpMinimize)
+days = list(range(7))
+x = LpVariable.dicts('staff_', days, lowBound=0, cat='Integer')
+model += lpSum([x[i] for i in days])
+
+# Define Constraints
+model += x[0] + x[3] + x[4] + x[5] + x[6] >= 31
+model += x[0] + x[1] + x[4] + x[5] + x[6] >= 45
+model += x[0] + x[1] + x[2] + x[5] + x[6] >= 40
+model += x[0] + x[1] + x[2] + x[3] + x[6] >= 40
+model += x[0] + x[1] + x[2] + x[3] + x[4] >= 48
+model += x[1] + x[2] + x[3] + x[4] + x[5] >= 30
+model += x[2] + x[3] + x[4] + x[5] + x[6] >= 25
+
+model.solve()
+
+
+# The class has been initialize, and x, hours and objective fuction defined
+model = LpProblem("Minimize Staffing", LpMinimize)
+hours = list(range(10))
+x = LpVariable.dicts('saws_', hours, lowBound=0, cat='Integer')
+model += lpSum([x[i] for i in hours])
+
+# Define Constraints
+model += x[0] + x[2] + x[3] + x[4] + x[5] + x[7] + x[8] + x[9] >= 7
+model += x[0] + x[1] + x[3] + x[4] + x[5] + x[6] + x[8] + x[9] >= 7
+model += x[0] + x[1] + x[2] + x[4] + x[5] + x[6] + x[7] + x[9] >= 7
+model += x[0] + x[1] + x[2] + x[3] + x[5] + x[6] + x[7] + x[8] >= 6
+model += x[1] + x[2] + x[3] + x[4] + x[6] + x[7] + x[8] + x[9] >= 5
+model += x[0] + x[2] + x[3] + x[4] + x[5] + x[7] + x[8] + x[9] >= 6
+model += x[0] + x[1] + x[3] + x[4] + x[5] + x[6] + x[8] + x[9] >= 6
+model += x[0] + x[1] + x[2] + x[4] + x[5] + x[6] + x[7] + x[9] >= 7
+model += x[0] + x[1] + x[2] + x[3] + x[5] + x[6] + x[7] + x[8] >= 7
+model += x[1] + x[2] + x[3] + x[4] + x[6] + x[7] + x[8] + x[9] >= 6
+
+model.solve()
+
+
+# Initialize Class
+model = LpProblem("Capacitated Plant Location Model", LpMinimize)
+
+# Define Decision Variables
+loc = ['USA', 'Germany', 'Japan', 'Brazil', 'India']
+size = ['Low_Cap','High_Cap']
+x = LpVariable.dicts("production_",
+                     [(i,j) for i in loc for j in loc],
+                     lowBound=0, upBound=None, cat='Continuous')
+y = LpVariable.dicts("plant_", 
+                     [(i, s) for s in size for i in loc], cat='Binary')
+                     
+                     
+# Initialize, and Define Decision Vars.
+model = LpProblem("Capacitated Plant Location Model", LpMinimize)
+loc = ['USA', 'Germany', 'Japan', 'Brazil', 'India']
+size = ['Low_Cap','High_Cap']
+x = LpVariable.dicts("production_", [(i,j) for i in loc for j in loc],
+                     lowBound=0, upBound=None, cat='Continous')
+y = LpVariable.dicts("plant_", 
+                     [(i,s) for s in size for i in loc], cat='Binary')
+
+# Define objective function
+model += (lpSum([fix_cost.loc[i,s] * y[(i,s)] 
+                 for s in size for i in loc])
+          + lpSum([var_cost.loc[i,j] * x[(i,j)] 
+                   for i in loc for j in loc]))
+                   
+                   
+# Initialized model, defined decision variables and objective
+model = LpProblem("Loading Truck Problem", LpMaximize)
+x = LpVariable.dicts('ship_', prod, cat='Binary')
+model += lpSum([prof[i] * x[i] for i in prod])
+
+# Define Constraint
+model += lpSum([weight[i] * x[i] for i in prod]) <= 25000
+model += x['D'] + x['E'] + x['F'] <= 1
+
+model.solve()
+for i in prod:
+    print("{} status {}".format(i, x[i].varValue))
+    
+    
+model = LpProblem("Loading Truck Problem", LpMinimize)
+x = LpVariable.dicts('ship_', cust, cat='Binary')
+model += lpSum([dist[i]*x[i] for i in cust])
+
+# Define Constraint
+model += x['A'] + x['B'] + x['C'] + x['D'] + x['E'] + x['F'] >= 1
+model += x['A'] - x['D'] <= 0
+model += x['B'] - x['E'] <= 0
+
+model.solve()
+for i in cust:
+    print("{} status {}".format(i, x[i].varValue))
+
+
+
+# 3) Solve and Evaluate Model
+
+
+
+
+# 4) Sensitivity and Simulation Testing of Model
