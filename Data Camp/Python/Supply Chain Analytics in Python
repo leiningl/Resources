@@ -175,7 +175,134 @@ for i in cust:
 
 # 3) Solve and Evaluate Model
 
+# Initialize, Define Decision Vars., Objective Function, and Constraints
+model = LpProblem("Aggregate Production Planning", LpMinimize)
+time = [0, 1, 2]
+prod = ['A', 'B', 'C', 'D', 'E']
+X = LpVariable.dicts("prod", [(t, p) for p in prod for t in time], 
+                     lowBound=0, cat="Integer")
+model += lpSum([costs.loc[t, p]*X[(t, p)] for p in prod for t in time])
+for p in prod:
+    for t in time:
+        model += X[(t, p)] >= demand.loc[t, p]
+        
+# Define Dependent Demand Constraints
+for t in time:
+    model += 2 * X[(t, 'E')] <= X[(t, 'A')]
+    model += 1 * X[(t, 'E')] + demand.loc[t, 'C'] <= X[(t, 'C')]
+    
+    
+# Initialize, Define Decision Vars., Objective Function, and Constraints
+model = LpProblem("Distribution Planning", LpMinimize)
+wh = ['W1','W2']
+prod = ['A', 'B', 'C']
+X = LpVariable.dicts("ship", [(w, p, c) for c in cust for p in prod for w in wh], 
+                     lowBound=0, cat="Integer")
+model += lpSum([X[(w, p, c)]*costs.loc[(w, p), c]  for c in cust for p in prod for w in wh])
+for c in cust:
+    for p in prod:
+        model += lpSum([X[(w, p, c)] for w in wh]) == demand.loc[p, c]
 
+# Define Dependent Demand Constraints
+model += ((1/10) * lpSum([X[('W1', 'A', c)] for c in cust]) 
+          + (1/15) * lpSum([X[('W1', 'B', c)] for c in cust])
+          + (1/20) * lpSum([X[('W1', 'C', c)] for c in cust])) <= 4
+          
+          
+# Initialize, Define Decision Vars., and Objective Function
+model = LpProblem("Capacitated Plant Location Model", LpMinimize)
+loc = ['USA', 'Germany', 'Japan', 'Brazil', 'India']
+size = ['Low_Cap','High_Cap']
+x = LpVariable.dicts("production_", [(i,j) for i in loc for j in loc],
+                     lowBound=0, upBound=None, cat='Continuous')
+y = LpVariable.dicts("plant_", 
+                     [(i,s) for s in size for i in loc], cat='Binary')
+model += (lpSum([fix_cost.loc[i,s] * y[(i,s)] for s in size for i in loc])
+          + lpSum([var_cost.loc[i,j] * x[(i,j)] for i in loc for j in loc]))
+
+# Define the constraints
+for j in loc:
+    model += lpSum([x[(i, j)] for i in loc]) == demand.loc[j,'Dmd']
+    
+    
+# Initialize, Define Decision Vars., and Objective Function
+model = LpProblem("Capacitated Plant Location Model", LpMinimize)
+loc = ['USA', 'Germany', 'Japan', 'Brazil', 'India']
+size = ['Low_Cap','High_Cap']
+x = LpVariable.dicts("production_", [(i,j) for i in loc for j in loc],
+                     lowBound=0, upBound=None, cat='Continuous')
+y = LpVariable.dicts("plant_", 
+                     [(i,s) for s in size for i in loc], cat='Binary')
+model += (lpSum([fix_cost.loc[i,s] * y[(i,s)] for s in size for i in loc])
+          + lpSum([var_cost.loc[i,j] * x[(i,j)] for i in loc for j in loc]))
+
+# Define the constraints
+for j in loc:
+    model += lpSum([x[(i, j)] for i in loc]) == demand.loc[j,'Dmd']
+for i in loc:
+    model += lpSum([x[(i, j)] for j in loc]) <= lpSum([cap.loc[i,s] * y[(i,s)] 
+                                                       for s in size])
+                                                       
+                                                       
+# Initialize, Define Decision Vars., Object. Fun., and Constraints
+model = LpProblem("Capacitated Plant Location Model", LpMinimize)
+loc = ['USA', 'Germany', 'Japan', 'Brazil', 'India']
+size = ['Low_Cap','High_Cap']
+x = LpVariable.dicts("production_", [(i,j) for i in loc for j in loc],
+                     lowBound=0, upBound=None, cat='Integer')
+y = LpVariable.dicts("plant_", 
+                     [(i,s) for s in size for i in loc], cat='Binary')
+model += (lpSum([fix_cost.loc[i,s] * y[(i,s)] for s in size for i in loc])
+          + lpSum([var_cost.loc[i,j] * x[(i,j)] for i in loc for j in loc]))
+for j in loc:
+    model += lpSum([x[(i, j)] for i in loc]) == demand.loc[j,'Dmd']
+for i in loc:
+    model += lpSum([x[(i, j)] for j in loc]) <= lpSum([cap.loc[i,s]*y[(i,s)] 
+                                                       for s in size])
+
+# Define logical constraint
+model += y[('USA','High_Cap')] - y[('Germany','Low_Cap')] <= 0
+
+
+# Print status
+print(LpStatus[model.status])
+
+# Print variables
+for v in model.variables():
+    print(v.name, "=", v.varValue)
+    
+print(LpStatus[model.status])
+
+# Print variables
+o = [{'prod':x[t].varValue, 'stock':s[t].varValue} for t in time]
+print(pd.DataFrame(o, index=time))
+
+# Print status
+print(LpStatus[model.status])
+
+# Print Objective Fun. Value
+print("Total Cost = ", value(model.objective))
+
+
+# Write model specifications to a file
+file_name = 'production_planning_lp.txt'
+model.writeLP(file_name)
+f = open(file_name)
+print(f.read())
+f.close()
+
+# Initialize, Define Decision Vars.
+model = LpProblem("Production Planning", LpMinimize)
+time = [1, 2, 3, 4]
+s = LpVariable.dicts("stock", [0, 1, 2, 3, 4], lowBound=0, cat="Integer")
+x = LpVariable.dicts("prod", time, lowBound=0, cat="Integer")
+y = LpVariable.dicts("plant_on", time, lowBound=0, cat="Binary")
+
+# Define Objective to Include Fixed Costs
+model += lpSum([d.loc[t,"unit_prod"] * x[t] + d.loc[t,"unit_inv"]*s[t] 
+                + d.loc[t,"fixed"] * y[t]
+                for t in time])
+                
 
 
 # 4) Sensitivity and Simulation Testing of Model
