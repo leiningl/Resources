@@ -1,0 +1,481 @@
+# 1) Understanding Twitter Data
+
+# Extract live tweets for 120 seconds window
+tweets120s <- stream_tweets("", timeout = 120)
+
+# View dimensions of the data frame with live tweets
+dim(tweets120s)
+
+
+# Extract tweets on "#Emmyawards" and include retweets
+twts_emmy <- search_tweets("#Emmyawards", 
+                 n = 2000, 
+                 include_rts = TRUE, 
+                 lang = "en")
+
+# View output for the first 5 columns and 10 rows
+head(twts_emmy[,1:5], 10)
+
+
+# Extract tweets posted by the user @Cristiano
+get_cris <- get_timeline("@Cristiano", n = 3200)
+
+# View output for the first 5 columns and 10 rows
+head(get_cris[,1:5], 10)
+
+
+# Create a table of users and tweet counts for the topic
+sc_name <- table(tweets_ai$screen_name)
+
+# Sort the table in descending order of tweet counts
+sc_name_sort <- sort(sc_name, decreasing = TRUE)
+
+# View sorted table for top 10 users
+head(sc_name_sort, 10)
+
+
+# Extract user data for the twitter accounts of 4 news sites
+users <- lookup_users("nytimes", "CNN", "FoxNews", "NBCNews")
+
+# Create a data frame of screen names and follower counts
+user_df <- users[,c("screen_name","followers_count")]
+
+# Display and compare the follower counts for the 4 news sites
+user_df
+
+
+# Create a data frame of tweet text and retweet count
+rtwt <- tweets_ai[,c("text", "retweet_count")]
+head(rtwt)
+
+# Sort data frame based on descending order of retweet counts
+rtwt_sort <- arrange(rtwt, desc(retweet_count))
+
+# Exclude rows with duplicate text from sorted data frame
+rtwt_unique <- unique(rtwt_sort, by = "text")
+
+# Print top 6 unique posts retweeted most number of times
+rownames(rtwt_unique) <- NULL
+head(rtwt_unique)
+
+
+
+# 2) Analyzing Twitter Data
+
+# Extract 100 original tweets on "Superbowl"
+tweets_org <- search_tweets("Superbowl -filter:retweets -filter:quote -filter:replies", n = 100)
+
+# Check for presence of replies
+count(tweets_org$reply_to_screen_name)
+
+# Check for presence of quotes
+count(tweets_org$is_quote)
+
+# Check for presence of retweets
+count(tweets_org$is_retweet)
+
+
+# Extract tweets on "Apple iphone" in French
+tweets_french <- search_tweets("Apple iphone", lang = "fr")
+
+# Display the tweets
+head(tweets_french$text)
+
+# Display the tweet metadata showing the language
+head(tweets_french$lang)
+
+
+# Extract tweets with a minimum of 100 retweets and 100 favorites
+tweets_pop <- search_tweets("Chelsea min_retweets:100 AND min_faves:100")
+
+# Create a data frame to check retweet and favorite counts
+counts <- tweets_pop[c("retweet_count", "favorite_count")]
+head(counts)
+
+# View the tweets
+head(tweets_pop$text)
+
+
+# Extract user information of people who have tweeted on the topic
+user_cos <- users_data(tweet_cos)
+
+# View few rows of user data
+head(user_cos)
+
+# Aggregate screen name, follower and friend counts
+counts_df <- user_cos %>%
+               group_by(screen_name) %>%
+               summarize(follower = mean(followers_count),
+                   friend = mean(friends_count))
+
+# View the output
+head(counts_df)
+
+
+# Calculate and store the golden ratio
+counts_df$ratio <- counts_df$follower/counts_df$friend
+
+# Sort the data frame in decreasing order of follower count
+counts_sort <- arrange(counts_df, desc(follower))
+
+# View the first few rows
+head(counts_sort)
+
+# Select rows where the follower count is greater than 50000
+counts_sort[counts_sort$follower>50000,]
+
+# Select rows where the follower count is less than 1000
+counts_sort[counts_sort$follower<1000,]
+
+
+# Extract all the lists "NBA" subscribes to and view the first 4 columns
+lst_NBA <- lists_users("NBA")
+lst_NBA[,1:4]
+
+# Extract subscribers of the list "nbateams" and view the first 4 columns
+list_NBA_sub <- lists_subscribers(slug  = "nbateams", owner_user = "NBA")
+list_NBA_sub[,1:4]
+
+# Create a list of 4 screen names from the subscribers list
+users <- c("JWBaker_4","towstend", "iKaanic", "Dalton_Boyd")
+
+# Extract user information for the list and view the first 4 columns
+users_NBA_sub <- lookup_users(users)
+users_NBA_sub[,1:4]
+
+
+# Get topics trending in Canada
+gt_country <- get_trends("Canada")
+
+
+# View the first 6 columns
+head(gt_country[,1:6])
+
+
+# Get topics trending in London
+gt_city <- get_trends("London")
+
+# View the first 6 columns
+head(gt_city[,1:6])
+
+# Aggregate the trends and tweet volumes
+trend_df <- gt_city %>%
+    group_by(trend) %>%
+    summarize(tweet_vol = mean(tweet_volume))
+
+# Sort data frame on descending order of tweet volumes and print header
+trend_df_sort <- arrange(trend_df, desc(tweet_vol))
+head(trend_df_sort,10)
+
+
+# Extract tweets on #walmart and exclude retweets
+walmart_twts <- search_tweets("#walmart", n = 18000, include_rts = FALSE)
+
+# View the output
+head(walmart_twts)
+
+# Create a time series plot
+ts_plot(walmart_twts, by = "hours", color = "blue")
+
+
+# Create a time series object for Puma at hourly intervals
+puma_ts <- ts_data(puma_st, by ='hours')
+
+# Rename the two columns in the time series object
+names(puma_ts) <- c("time", "puma_n")
+
+# View the output
+head(puma_ts)
+
+# Create a time series object for Nike at hourly intervals
+nike_ts <- ts_data(nike_st, by ='hours')
+
+# Rename the two columns in the time series object
+names(nike_ts) <- c("time", "nike_n")
+
+# View the output
+head(nike_ts)
+
+
+# Merge the two time series objects and retain "time" column
+merged_df <- merge(puma_ts, nike_ts, by = "time", all = TRUE)
+head(merged_df)
+
+# Stack the tweet frequency columns
+melt_df <- melt(merged_df, na.rm = TRUE, id.vars = "time")
+
+# View the output
+head(melt_df)
+
+# Plot frequency of tweets on Puma and Nike
+ggplot(data = melt_df, aes(x = time, y = value, col = variable))+
+  geom_line(lwd = 0.8)
+  
+
+
+# 3) VIsualize Tweet Texts
+
+# Extract tweet text from the pre-loaded dataset
+twt_txt <- twt_telmed$text
+head(twt_txt)
+
+# Remove URLs from the tweet text and view the output
+twt_txt_url <- rm_twitter_url(twt_txt)
+head(twt_txt_url)
+
+# Replace special characters, punctuation, & numbers with spaces
+twt_txt_chrs  <- gsub("[^A-Za-z]"," " , twt_txt_url)
+
+# View text after replacing special characters, punctuation, & numbers
+head(twt_txt_chrs)
+
+
+# Convert text in "twt_gsub" dataset to a text corpus and view output
+twt_corpus <- twt_gsub %>% 
+                VectorSource() %>% 
+                Corpus() 
+head(twt_corpus$content)
+
+# Convert the corpus to lowercase
+twt_corpus_lwr <- tm_map(twt_corpus, tolower) 
+
+# View the corpus after converting to lowercase
+head(twt_corpus_lwr$content)
+
+
+# Remove English stop words from the corpus and view the corpus
+twt_corpus_stpwd <- tm_map(twt_corpus_lwr, removeWords, stopwords("english"))
+head(twt_corpus_stpwd$content)
+
+# Remove additional spaces from the corpus
+twt_corpus_final <- tm_map(twt_corpus_stpwd, stripWhitespace)
+
+# View the text corpus after removing spaces
+head(twt_corpus_final$content)
+
+
+# Extract term frequencies for top 60 words and view output
+termfreq  <-  freq_terms(twt_corpus, 60)
+termfreq
+
+# Create a vector of custom stop words
+custom_stopwds <- c("telemedicine", " s", "amp", "can", "new", "medical", 
+				"will", "via", "way",  "today", "come", "t", "ways", 
+                "say", "ai", "get", "now")
+
+# Remove custom stop words and create a refined corpus
+corp_refined <- tm_map(twt_corpus,removeWords, custom_stopwds) 
+
+# Extract term frequencies for the top 20 words
+termfreq_clean <- freq_terms(corp_refined, 20)
+termfreq_clean
+
+
+# Extract term frequencies for the top 10 words
+termfreq_10w <- freq_terms(corp_refined, 10)
+termfreq_10w
+
+# Identify terms with more than 60 counts from the top 10 list
+term60 <- subset(termfreq_10w, FREQ > 60)
+
+# Create a bar plot using terms with more than 60 counts
+ggplot(term60, aes(x = reorder(WORD, -FREQ), y = FREQ)) + 
+		geom_bar(stat = "identity", fill = "red") + 
+		theme(axis.text.x = element_text(angle = 15, hjust = 1))
+    
+# Extract term frequencies for the top 25 words
+termfreq_25w <- freq_terms(corp_refined, 25)
+termfreq_25w
+
+# Identify terms with more than 50 counts from the top 25 list
+term50 <- subset(termfreq_25w, FREQ > 50)
+term50
+
+# Create a bar plot using terms with more than 50 counts
+ggplot(term50, aes(x = reorder(WORD, -FREQ), y = FREQ)) +
+		geom_bar(stat = "identity", fill = "blue") + 
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        
+        
+# Create a word cloud in red with min frequency of 20
+wordcloud(corp_refined, min.freq = 20, colors = "red", 
+    scale = c(3,0.5),random.order = FALSE)
+    
+# Create word cloud with 6 colors and max 50 words
+wordcloud(corp_refined, max.words = 50, 
+    colors = brewer.pal(6, "Dark2"), 
+    scale=c(4,1), random.order = FALSE)
+    
+
+# Create a document term matrix (DTM) from the pre-loaded corpus
+dtm_climate <- DocumentTermMatrix(corpus_climate)
+dtm_climate
+
+# Find the sum of word counts in each document
+rowTotals <- apply(dtm_climate, 1, sum)
+head(rowTotals)
+
+# Select rows with a row total greater than zero
+dtm_climate_new <- dtm_climate[rowTotals > 0, ]
+dtm_climate_new
+
+
+# Create a topic model with 5 topics
+topicmodl_5 <- LDA(dtm_climate_new, k = 5)
+
+# Select and view the top 10 terms in the topic model
+top_10terms <- terms(topicmodl_5,10)
+top_10terms 
+
+
+# Perform sentiment analysis for tweets on `Climate change` 
+sa.value <- get_nrc_sentiment(tweets_cc$text)
+
+# View the sentiment scores
+head(sa.value, 10)
+
+
+# Calculate sum of sentiment scores
+score <- colSums(sa.value[,])
+
+# Convert the sum of scores to a data frame
+score_df <- data.frame(score)
+
+# Convert row names into 'sentiment' column and combine with sentiment scores
+score_df2 <- cbind(sentiment = row.names(score_df),  
+				  score_df, row.names = NULL)
+print(score_df2)
+
+# Plot the sentiment scores
+ggplot(data = score_df2, aes(x = sentiment, y = score, fill = sentiment)) +
+  	 geom_bar(stat = "identity") +
+       theme(axis.text.x = element_text(angle = 45, hjust = 1))
+       
+
+
+# 4) Network Analysis and putting Twitter Data on the Map
+
+# Extract source vertex and target vertex from the tweet data frame
+rtwt_df <- twts_trvl[, c("screen_name" , "retweet_screen_name" )]
+
+# View the data frame
+head(rtwt_df)
+
+# Remove rows with missing values
+rtwt_df_new <- rtwt_df[complete.cases(rtwt_df), ]
+
+# Create a matrix
+rtwt_matrx <- as.matrix(rtwt_df_new)
+head(rtwt_matrx)
+
+
+# Convert the matrix to a retweet network
+nw_rtweet <- graph_from_edgelist(el = rtwt_matrx, directed = TRUE)
+
+# View the retweet network
+print.igraph(nw_rtweet)
+
+
+# Calculate out-degree scores from the retweet network
+out_degree <- degree(nw_rtweet, mode = c("out"))
+
+# Sort the out-degree scores in decreasing order
+out_degree_sort <- sort(out_degree, decreasing = TRUE)
+
+# View users with the top 10 out-degree scores
+out_degree_sort[1:10]
+
+
+# Compute the in-degree scores from the retweet network
+in_degree <- degree(nw_rtweet, mode = c("in"))
+
+# Sort the in-degree scores in decreasing order
+in_degree_sort <- sort(in_degree, decreasing = TRUE)
+
+# View users with the top 10 in-degree scores
+in_degree_sort[1:10]
+
+
+# Calculate the betweenness scores from the retweet network
+betwn_nw <- betweenness(nw_rtweet, directed = TRUE)
+
+# Sort betweenness scores in decreasing order and round the values
+betwn_nw_sort <- betwn_nw %>%
+                    sort(decreasing = TRUE) %>%
+                    round()
+
+# View users with the top 10 betweenness scores 
+betwn_nw_sort[1:10]
+
+
+# Create a basic network plot
+plot.igraph(nw_rtweet)
+
+# Create a network plot with formatting attributes
+set.seed(1234)
+plot(nw_rtweet, asp = 9/12, 
+     vertex.size = 10,
+	   vertex.color = "green", 
+     edge.arrow.size = 0.5,
+     edge.color = "black",
+     vertex.label.cex = 0.9,
+     vertex.label.color = "black")
+     
+     
+# Create a variable for out-degree
+deg_out <- degree(nw_rtweet, mode = c("out"))
+deg_out
+
+# Amplify the out-degree values
+vert_size <- (deg_out * 3) + 5
+
+# Set vertex size to amplified out-degree values
+set.seed(1234)
+plot(nw_rtweet, asp = 10/11, 
+     vertex.size = vert_size, vertex.color = "lightblue",
+     edge.arrow.size = 0.5,
+     edge.color = "grey",
+     vertex.label.cex = 0.8,
+     vertex.label.color = "black")
+     
+     
+# Create a column and categorize follower counts above and below 500
+followers$follow <- ifelse(followers$followers_count > 500, "1", "0")
+head(followers)
+
+# Assign the new column as vertex attribute to the retweet network
+V(nw_rtweet)$followers <- followers$follow
+vertex_attr(nw_rtweet)
+
+# Set the vertex colors based on follower count and create a plot
+sub_color <- c("lightgreen", "tomato")
+plot(nw_rtweet, asp = 9/12,
+     vertex.size = vert_size, edge.arrow.size = 0.5,
+     vertex.label.cex = 0.8,
+     vertex.color = sub_color[as.factor(vertex_attr(nw_rtweet, "followers"))],
+     vertex.label.color = "black", vertex.frame.color = "grey")
+     
+     
+# Extract 18000 tweets on #vegan
+vegan <- search_tweets("#vegan", n = 18000)
+
+# Extract geo-coordinates data to append as new columns
+vegan_coord <- lat_lng(vegan)
+
+# View the columns with geo-coordinates for first 20 tweets
+head(vegan_coord[c("lat","lng")], 20)
+
+
+# Omit rows with missing geo-coordinates in the data frame
+vegan_geo <- na.omit(vegan_coord[,c("lat", "lng")])
+
+# View the output
+head(vegan_geo)
+
+# Plot longitude and latitude values of tweets on the US state map
+map(database = "state", fill = TRUE, col = "light yellow")
+with(vegan_geo, points(lng, lat, pch = 20, cex = 1, col = 'blue'))
+
+# Plot longitude and latitude values of tweets on the world map
+map(database = "world", fill = TRUE, col = "light yellow")
+with(vegan_geo, points(lng, lat, pch = 20, cex = 1, col = 'blue')) 
